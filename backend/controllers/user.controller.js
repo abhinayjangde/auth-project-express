@@ -1,6 +1,9 @@
+import bcrypt from "bcryptjs"
 import User from "../models/User.js"
 import crypto from "crypto"
 import nodemailer from "nodemailer"
+import jwt from "jsonwebtoken"
+
 
 const registerUser = async (req, res) => {
     // get data from req.body
@@ -91,12 +94,12 @@ const registerUser = async (req, res) => {
 
 }
 
-const verifyUser = async (req,res)=>{
+const verifyUser = async (req, res) => {
     // get token from url (params)
-    const {token} = req.params
+    const { token } = req.params
     console.log(token)
     // validate
-    if(!token){
+    if (!token) {
         res.status(400).json({
             success: false,
             message: "Invalid token"
@@ -105,25 +108,25 @@ const verifyUser = async (req,res)=>{
     }
     try {
         // find user based on token
-    const user = await User.findOne({verificationToken: token})
-    // if not
-    if(!user){
-        res.status(400).json({
-            success: false,
-            message: "Invalid token"
+        const user = await User.findOne({ verificationToken: token })
+        // if not
+        if (!user) {
+            res.status(400).json({
+                success: false,
+                message: "Invalid token"
+            })
+        }
+        // set isVerified field true
+        user.isVerified = true
+        // remove verification token
+        user.verificationToken = undefined
+        // save
+        await user.save()
+        // return response
+        res.status(200).json({
+            success: true,
+            message: "User verified successfully."
         })
-    }
-    // set isVerified field true
-    user.isVerified = true
-    // remove verification token
-    user.verificationToken = undefined
-    // save
-    await user.save()
-    // return response
-    res.status(200).json({
-        success: true,
-        message: "User verified successfully."
-    })
 
     } catch (error) {
         res.status(400).json({
@@ -134,4 +137,89 @@ const verifyUser = async (req,res)=>{
     }
 }
 
-export { registerUser, verifyUser }
+const loginUser = async (req, res) => {
+
+    // get credentials from body
+    const { email, password } = req.body
+
+    // validate
+    if (!email || !password) {
+        res.status(400).json({
+            success: false,
+            message: "All fields are required"
+        })
+    }
+    try {
+
+        // find user by email
+        const user = await User.findOne({ email: email })
+
+        // if not
+        if (!user) {
+            res.status(400).json({
+                success: false,
+                message: "Invalid email or password!"
+            })
+        }
+
+        // check if user is verifiled
+        if(!user.isVerified){
+            res.status(400).json({
+                success: false,
+                message: "Please verify your email"
+            })
+        }
+
+        // password validation
+        const isMatched = await bcrypt.compare(password, user.password)
+        if (!isMatched) {
+            res.status(400).json({
+                success: false,
+                message: "Invalid email or password!"
+            })
+        }
+
+        // jwt token
+        const token = jwt.sign(
+            { id: user._id, role: user.role },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: "24h"
+            }
+        )
+
+        // package: npm i cookie-parser
+        const cookieOptions = {
+            httpOnly: true,
+            secure: true,
+            maxAge: 24 * 60 * 60 * 100
+        }
+        res.cookie("test", token, cookieOptions)
+
+        // send response
+        res.status(200).json({
+            success: true,
+            message: "Login successful",
+            token,
+            user: {
+                id: user._id,
+                name: user.name,
+                role: user.role,
+                email: user.email
+            }
+        })
+    } catch (error) {
+        res.status(400).json({
+            success: false,
+            message: "Error while login"
+        })
+    }
+}
+
+// TODO
+// logout
+// user-profile
+// forget-password
+// reset-password
+
+export { registerUser, verifyUser, loginUser }
