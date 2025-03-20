@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken"
 const registerUser = async (req, res) => {
     // get data from req.body
     const { name, email, password } = await req.body
-
+    console.log("user data", name, email, password)
     // validate
     if (!name || !email || !password) {
         res.status(400).json({
@@ -95,9 +95,11 @@ const registerUser = async (req, res) => {
 }
 
 const verifyUser = async (req, res) => {
+
     // get token from url (params)
     const { token } = req.params
     console.log(token)
+
     // validate
     if (!token) {
         res.status(400).json({
@@ -137,6 +139,7 @@ const verifyUser = async (req, res) => {
     }
 }
 
+// login user
 const loginUser = async (req, res) => {
 
     // get credentials from body
@@ -163,7 +166,7 @@ const loginUser = async (req, res) => {
         }
 
         // check if user is verifiled
-        if(!user.isVerified){
+        if (!user.isVerified) {
             res.status(400).json({
                 success: false,
                 message: "Please verify your email"
@@ -194,7 +197,7 @@ const loginUser = async (req, res) => {
             secure: true,
             maxAge: 24 * 60 * 60 * 100
         }
-        res.cookie("test", token, cookieOptions)
+        res.cookie("token", token, cookieOptions)
 
         // send response
         res.status(200).json({
@@ -216,10 +219,62 @@ const loginUser = async (req, res) => {
     }
 }
 
-// TODO
-// logout
 // user-profile
-// forget-password
-// reset-password
+const getMe = async (req, res) => {
+    try {
+        // find user
+        const user = await User.findById(req.user.id).select("-password")
 
-export { registerUser, verifyUser, loginUser }
+        // if not exists
+        if (!user) {
+            res.status(400).json({
+                success: false,
+                message: "User not found"
+            })
+
+        }
+        res.status(200).json({
+            success: true,
+            message: "Getting user profile",
+            data: user
+        })
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        })
+    }
+}
+
+// logout
+const logoutUser = async (req, res) => {
+    try {
+        req.cookie("token", "", {
+            expires: new Date(0)
+        })
+        res.status(500).json({
+            success: true,
+            message: "Logged out successfully"
+        })
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({
+            success: false,
+            message: "Internal server error in logout"
+        })
+    }
+}
+
+// forget-password
+const forgotPassword = async (req, res) => {
+
+}
+
+// reset-password
+const resetPassword = async (req, res) => {
+
+}
+
+
+export { registerUser, verifyUser, loginUser, getMe, logoutUser, forgotPassword, resetPassword }
